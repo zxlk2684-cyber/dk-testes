@@ -2,9 +2,9 @@
   "name": "dk-gengar-rat",
   "version": "1.3.0",
   "description": "DK GENGAR RAT Server",
-  "main": "server_clean.js",
+  "main": "server.js",
   "scripts": {
-    "start": "node server_clean.js"
+    "start": "node server.js"
   },
   "dependencies": {
     "express": "^4.18.2",
