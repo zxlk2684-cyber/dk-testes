@@ -12,6 +12,11 @@ app.get("/", (req, res) => {
     res.sendFile(path.join(__dirname, "index.html"));
 });
 
+// Rota de Healthcheck para o Railway
+app.get("/health", (req, res) => {
+    res.status(200).send("OK");
+});
+
 io.on("connection", (socket) => {
     console.log("Nova conexão Socket.io");
 
@@ -32,6 +37,18 @@ io.on("connection", (socket) => {
 
     socket.on("screen_frame", (frame) => {
         io.emit("screen_frame", frame);
+    });
+
+    // Novo evento para fotos capturadas
+    socket.on("photo_captured", (data) => {
+        console.log("Foto recebida do dispositivo");
+        io.emit("display_photo", data.image);
+    });
+
+    // Novo evento para localização recebida
+    socket.on("location_received", (data) => {
+        console.log("Localização recebida:", data.lat, data.lon);
+        io.emit("display_location", data);
     });
 
     socket.on("disconnect", () => {
